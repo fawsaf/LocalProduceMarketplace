@@ -2,6 +2,23 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 import uuid
 class User(AbstractUser):
+    # Add related_name to groups and user_permissions
+    groups = models.ManyToManyField(
+        'auth.Group',
+        verbose_name='groups',
+        blank=True,
+        help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.',
+        related_name="marketplace_user_set",  # Unique related_name
+        related_query_name="marketplace_user",
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        verbose_name='user permissions',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        related_name="marketplace_user_permission_set",  # Unique related_name
+        related_query_name="marketplace_user_permission",
+    )
     # Directly available fields from AbstractUser (no need to redefine these in the model):
     # - username (String): A unique identifier for the user.
     # - first_name (String): The user's first name.
