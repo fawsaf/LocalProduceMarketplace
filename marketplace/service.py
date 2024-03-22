@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.models import update_last_login
 from rest_framework.authtoken.models import Token
-from ..utils import *
+from utils import *
 from .serializers import UserSerializer
 from .models import *
 

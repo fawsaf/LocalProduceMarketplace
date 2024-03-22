@@ -3,8 +3,8 @@ from django.shortcuts import render
 # Create your views here.
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-import service
-from ..utils import *
+from . import service
+from utils import *
 
 @api_view(['POST'])
 def register_user(request):
