@@ -50,6 +50,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+AUTH_USER_MODEL = 'marketplace.User'
+
 ROOT_URLCONF = 'local_produce_marketplace.urls'
 
 TEMPLATES = [

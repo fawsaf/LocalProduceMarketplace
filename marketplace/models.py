@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.conf import settings
 import uuid
 class User(AbstractUser):
     # Add related_name to groups and user_permissions
@@ -43,7 +44,7 @@ class User(AbstractUser):
 class Product(models.Model):
     id = models.UUIDField(default=uuid.uuid4, unique=True,
                           primary_key=True, editable=False)
-    farmer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
+    farmer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -54,7 +55,7 @@ class Product(models.Model):
 class Order(models.Model):
     id = models.UUIDField(default=uuid.uuid4, unique=True,
                           primary_key=True, editable=False)
-    consumer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
+    consumer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders')
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=100, default='Placed')  # E.g., Placed, Shipped, Delivered, Cancelled
@@ -65,6 +66,15 @@ class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.IntegerField()
+
+class Review(models.Model):
+    product = models.ForeignKey('Product', related_name='reviews', on_delete=models.CASCADE)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='reviews', on_delete=models.CASCADE)
+    parent = models.ForeignKey('self', related_name='comments', on_delete=models.CASCADE, null=True, blank=True)
+    rating = models.IntegerField(default=0)
+    comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
     '''
 class FarmingData(models.Model):
     farmer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='farming_data')
