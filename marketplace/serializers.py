@@ -11,8 +11,8 @@ class UserSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = '__all__'
-
+        fields = ['name', 'description', 'price', 'image_url','quantity_available']
+        
 class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem

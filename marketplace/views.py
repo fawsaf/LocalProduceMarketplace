@@ -9,6 +9,8 @@ from django.contrib.auth import get_user_model, authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import permission_classes
 from rest_framework.permissions import IsAuthenticated
+import json
+from .permissions import IsFarmer
 
 @api_view(['POST'])
 def register_user(request):
@@ -43,6 +45,23 @@ def login_user(request):
         response=create_response(500, ResponseCodes.ERROR, False, {}, "Error", str(e))
         return response
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_user(request):
+    try:
+        user=request.user
+        service.logout_user_service(user)
+        response = create_response(200, "LOGOUT_SUCCESS", True, {}, None, "You have been successfully logged out.")
+        return Response(response, status=200)
+    except BusinessException as e:
+        # Handle specific business logic errors
+        response = create_response(400, "LOGOUT_FAILED", False, {}, "Logout Failed", str(e))
+        return Response(response, status=400)
+    except Exception as e:
+        # Handle unexpected errors
+        response = create_response(500, "ERROR", False, {}, "Error", str(e))
+        return Response(response, status=500)
+    
 @api_view(['GET', 'PUT'])
 def user_profile(request):
     try:
@@ -66,7 +85,7 @@ def user_profile(request):
 
 
 @api_view(['POST'])
-@login_required
+@permission_classes([IsFarmer])
 def create_product(request):
     try:
         data=request.data
@@ -94,13 +113,12 @@ def list_products(request):
         return Response(create_response(500, "ERROR", False, {}, "Error", str(e)))
 
 @api_view(['PUT', 'DELETE'])
-@login_required
-def update_product(request, pk):
+@permission_classes([IsFarmer])
+def update_product(request, id):
     if request.method == 'PUT':
         try:
             data=request.data
-            data.pop('quantity_available', None)
-            product = service.update_product_service(pk, data, request.user)
+            product = service.update_product_service(id, data, request.user)
             return Response(create_response(200, "PRODUCT_UPDATED", True, product, None, "Product updated successfully."))
         except BusinessException as e:
             return Response(create_response(400, "INVALID_DATA", False, {}, "Invalid Data", str(e)))
@@ -118,7 +136,29 @@ def update_product(request, pk):
             return Response(create_response(500, "ERROR", False, {}, "Error", str(e)))
 
 @api_view(['POST'])
-@login_required
+@permission_classes([IsFarmer])
+def bulk_create_products(request):
+    file = request.FILES.get('file')
+    if not file:
+        return Response({'error': 'No file provided.'}, status=400)
+    
+    try:
+        file_content = file.read()
+        # Convert the read content to the correct encoding and then load it as JSON
+        products_data = json.loads(file_content.decode('utf-8'))
+        if(request.user.is_farmer):
+            farmer=request.user
+        else:
+            raise BusinessException({'error': 'Nota farmer.'})
+        # Now, you can pass this data to your service function
+        # Assuming your service function expects a list of dictionaries
+        response_data = service.create_bulk_products_service(products_data,farmer)
+        return Response(create_response(200, ResponseCodes.SUCCESS, True, response_data, None, "bulk_create_products"))
+    except BusinessException as e:
+        return Response({'error': str(e)}, status=400)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_order(request):
     try:
         data=request.data
@@ -131,25 +171,12 @@ def create_order(request):
         return Response(create_response(500, "ERROR", False, {}, "Error", str(e)))
 
 @api_view(['GET'])
-@login_required
+@permission_classes([IsAuthenticated])
 def list_orders(request):
     user=request.user
     orders = service.list_orders_service(user)  # Assuming this service returns a QuerySet of orders
     return Response(create_response(200, "ORDERS_LISTED", True, orders, None, None))
 
-@api_view(['PATCH'])
-@login_required
-def update_stock_level(request, product_id):
-    try:
-        new_quantity = request.data.get('quantity_available')
-        product = service.update_stock_level_service(product_id, request.user, new_quantity)
-        return Response(create_response(200, ResponseCodes.SUCCESS, True, product, None, "Stock level updated successfully."))
-    except PermissionError as e:
-        return Response(create_response(403, "FORBIDDEN", False, {}, "Forbidden", str(e)))
-    except BusinessException as e:
-        return Response(create_response(400, "INVALID_QUANTITY", False, {}, "Invalid Quantity", str(e)))
-    except Exception as e:
-        return Response(create_response(500, "ERROR", False, {}, "Error", str(e)))
     
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -177,3 +204,4 @@ def list_reviews_with_comments(request, product_id):
         # Catch-all for unexpected errors
         response = create_response(500, ResponseCodes.ERROR, False, None, "UNKNOWN_ERROR", "An unexpected error occurred during registration.")
         return Response(response, status=500)
+    

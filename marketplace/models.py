@@ -48,8 +48,9 @@ class Product(models.Model):
     name = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    quantity_available = models.IntegerField()
+    quantity_available = models.IntegerField(default=0)
     description = models.TextField(blank=True, null=True)
+    image_url = models.URLField(max_length=1024, null=True, blank=True)
     # Consider adding an image field and more metadata as needed.
 
 class Order(models.Model):

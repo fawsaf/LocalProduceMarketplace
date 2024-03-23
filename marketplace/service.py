@@ -4,7 +4,8 @@ from rest_framework.authtoken.models import Token
 from utils import *
 from .serializers import *
 from .models import *
-
+from django.db import transaction
+import json
 def register_user_service(username, email, password, is_farmer=False, is_consumer=False,**extra_fields):
     if User.objects.filter(email=email).exists():
         raise BusinessException(f"Username '{username}' is already taken.")
@@ -12,7 +13,16 @@ def register_user_service(username, email, password, is_farmer=False, is_consume
     serializer= UserSerializer(user)
     return serializer.data
 
-
+def logout_user_service(user):
+    try:
+        token = Token.objects.get(user=user)
+        token.delete()
+    except Token.DoesNotExist:
+        # Raise a BusinessException if the token does not exist
+        raise BusinessException("Authentication token not found.")
+    except Exception as e:
+        # Raise a generic exception for any unexpected errors
+        raise Exception(f"Unexpected error during logout: {str(e)}")
 
 def get_user_profile_service(user_id):
     try:
@@ -54,7 +64,8 @@ def create_product_service(data, user):
         category=data['category'],
         price=data['price'],
         quantity_available=data['quantity_available'],
-        description=data.get('description', '')  # Defaulting to empty string if no description is provided
+        description=data['description'],  # Defaulting to empty string if no description is provided
+        image_url=data['image_url']
     )
     serializer = ProductSerializer(product)
     return serializer.data  # Returning the product instance
@@ -75,7 +86,7 @@ def list_products_service(category=None, search_query=None):
 def update_product_service(product_id, data, user):
     product = Product.objects.get(pk=product_id, farmer=user)
     
-    serializer = ProductSerializer(product, data=data)
+    serializer = ProductSerializer(product, data=data, partial=True)
     if serializer.is_valid(raise_exception=True):
         serializer.save()
     return serializer.data
@@ -107,22 +118,7 @@ def list_orders_service(user):
     serializer = OrderSerializer(orders, many=True)
     return serializer.data
 
-def update_stock_level_service(product_id, user, new_quantity):
-    if not user.is_farmer:
-        raise PermissionError("Only farmers are allowed to update stock levels.")
-    
-    try:
-        product = Product.objects.get(pk=product_id, farmer=user)
-    except Product.DoesNotExist:
-        raise Product.DoesNotExist("Product not found.")
-    
-    if new_quantity is None or not isinstance(new_quantity, int) or new_quantity < 0:
-        raise BusinessException("A valid 'quantity_available' is required.")
-    
-    product.quantity_available = new_quantity
-    product.save(update_fields=['quantity_available'])
-    serializer = ProductSerializer(product)
-    return serializer.data
+
 
 def create_review_or_reply_service(user, product_id, parent_id=None, rating=None, comment=None):
     try:
@@ -186,3 +182,32 @@ def list_reviews_with_comments_service(product_id):
     reviews = Review.objects.filter(product_id=product_id, parent__isnull=True).prefetch_related('comments')
     serializer = ReviewSerializer(reviews, many=True)
     return serializer.data
+
+def create_bulk_products_service(products_data,farmer):
+    # Assuming products_data is a list of dictionaries with product information
+    if not isinstance(products_data, list):
+        raise ValueError("Expected a list of product data.")
+
+    # Prepare a list to hold Product instances
+    products_to_create = []
+
+    for product_data in products_data:
+        # Perform necessary validation on product_data here
+        # For simplicity, this example assumes product_data is valid and complete
+        
+        # Create a Product instance for each product (without saving to the database)
+        product_instance = Product(
+            name=product_data['name'],
+            description=product_data.get('description', ''),
+            price=product_data['price'],
+            quantity_available=product_data.get('quantity_available', 0),
+            image_url=product_data.get('image_url', ''),  # Assuming these keys exist in your product_data
+            farmer=farmer
+        )
+        products_to_create.append(product_instance)
+
+    # Use Django's bulk_create to insert all products at once
+    # The use of transaction.atomic() ensures that all products are created successfully
+    # or none at all if any error occurs, maintaining database integrity
+    with transaction.atomic():
+        created_products = Product.objects.bulk_create(products_to_create)
